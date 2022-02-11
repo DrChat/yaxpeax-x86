@@ -121,7 +121,11 @@ pub use protected_mode::Arch as x86_32;
 
 pub mod real_mode;
 pub use real_mode::Arch as x86_16;
+use yaxpeax_arch::AddressDiff;
 use yaxpeax_arch::Instruction;
+use yaxpeax_arch::LengthedInstruction;
+
+// mod common;
 
 use crate::safer_unchecked::unreachable_kinda_unchecked as unreachable_unchecked;
 
@@ -215,6 +219,10 @@ pub trait X86Instruction: Instruction {
     /// `stos`, `lods`, `movs`, and `cmps` specifically name some segments for use regardless of
     /// prefixes.
     fn segment_override_for_op(&self, op: u8) -> Option<Segment>;
+
+    /// Return the length of this instruction.
+    // FIXME: This should be part of LengthedInstruction, but address size differences make this hard.
+    fn len(&self) -> AddressDiff<u64>;
 }
 
 impl X86Instruction for crate::long_mode::Instruction {
@@ -232,6 +240,10 @@ impl X86Instruction for crate::long_mode::Instruction {
 
     fn segment_override_for_op(&self, op: u8) -> Option<Segment> {
         self.segment_override_for_op(op)
+    }
+
+    fn len(&self) -> AddressDiff<u64> {
+        <Self as LengthedInstruction>::len(&self)
     }
 }
 
@@ -251,6 +263,12 @@ impl X86Instruction for crate::protected_mode::Instruction {
     fn segment_override_for_op(&self, op: u8) -> Option<Segment> {
         self.segment_override_for_op(op)
     }
+
+    fn len(&self) -> AddressDiff<u64> {
+        let len = <Self as LengthedInstruction>::len(&self);
+
+        AddressDiff::from_const(len.to_const() as u64)
+    }
 }
 
 impl X86Instruction for crate::real_mode::Instruction {
@@ -268,6 +286,12 @@ impl X86Instruction for crate::real_mode::Instruction {
 
     fn segment_override_for_op(&self, op: u8) -> Option<Segment> {
         self.segment_override_for_op(op)
+    }
+
+    fn len(&self) -> AddressDiff<u64> {
+        let len = <Self as LengthedInstruction>::len(&self);
+
+        AddressDiff::from_const(len.to_const() as u64)
     }
 }
 
@@ -1009,6 +1033,24 @@ impl Operand {
             | Operand::RegisterMaskMergeSae(_, _, _, _)
             | Operand::RegisterMaskMergeSaeNoround(_, _, _)
             | Operand::Nothing => false,
+        }
+    }
+
+    /// returns `true` if this operand is an immediate parameter, `false` otherwise.
+    pub fn is_immediate(&self) -> bool {
+        match self {
+            Self::ImmediateI8(_)
+            | Self::ImmediateU8(_)
+            | Self::ImmediateI16(_)
+            | Self::ImmediateU16(_)
+            | Self::ImmediateI32(_)
+            | Self::ImmediateU32(_)
+            | Self::ImmediateI64(_)
+            | Self::ImmediateU64(_) => {
+                true
+            }
+
+            _ => false,
         }
     }
 
