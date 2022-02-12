@@ -201,7 +201,7 @@ impl core::fmt::Debug for MemoryAccessSize {
     }
 }
 
-pub trait X86Instruction: Instruction {
+pub trait X86Instruction: Instruction + core::fmt::Display {
     /// Get the opcode of this instruction
     fn opcode(&self) -> Opcode;
 
