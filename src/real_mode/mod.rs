@@ -313,7 +313,7 @@ enum OperandSpec {
 pub struct Arch;
 
 impl yaxpeax_arch::Arch for Arch {
-    type Address = u32;
+    type Address = u64;
     type Word = u8;
     type Instruction = Instruction;
     type DecodeError = DecodeError;
@@ -322,7 +322,7 @@ impl yaxpeax_arch::Arch for Arch {
 }
 
 impl LengthedInstruction for Instruction {
-    type Unit = AddressDiff<u32>;
+    type Unit = AddressDiff<u64>;
     #[inline]
     fn len(&self) -> Self::Unit {
         AddressDiff::from_const(self.length.into())

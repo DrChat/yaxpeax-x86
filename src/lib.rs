@@ -121,11 +121,8 @@ pub use protected_mode::Arch as x86_32;
 
 pub mod real_mode;
 pub use real_mode::Arch as x86_16;
-use yaxpeax_arch::AddressDiff;
-use yaxpeax_arch::Instruction;
-use yaxpeax_arch::LengthedInstruction;
 
-// mod common;
+pub mod common;
 
 use crate::safer_unchecked::unreachable_kinda_unchecked as unreachable_unchecked;
 
@@ -198,100 +195,6 @@ impl core::fmt::Display for MemoryAccessSize {
 impl core::fmt::Debug for MemoryAccessSize {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         core::fmt::Display::fmt(self, f)
-    }
-}
-
-pub trait X86Instruction: Instruction + core::fmt::Display {
-    /// Get the opcode of this instruction
-    fn opcode(&self) -> Opcode;
-
-    /// get the `Operand` at the provided index.
-    ///
-    /// panics if the index is `>= 4`.
-    fn operand(&self, i: u8) -> Operand;
-
-    /// get the number of operands in this instruction. useful in iterating an instruction's
-    /// operands generically.
-    fn operand_count(&self) -> u8;
-
-    /// get the `Segment` that will *actually* be used for accessing the operand at index `i`.
-    ///
-    /// `stos`, `lods`, `movs`, and `cmps` specifically name some segments for use regardless of
-    /// prefixes.
-    fn segment_override_for_op(&self, op: u8) -> Option<Segment>;
-
-    /// Return the length of this instruction.
-    // FIXME: This should be part of LengthedInstruction, but address size differences make this hard.
-    fn len(&self) -> AddressDiff<u64>;
-}
-
-impl X86Instruction for crate::long_mode::Instruction {
-    fn opcode(&self) -> Opcode {
-        self.opcode()
-    }
-
-    fn operand(&self, i: u8) -> Operand {
-        self.operand(i)
-    }
-
-    fn operand_count(&self) -> u8 {
-        self.operand_count()
-    }
-
-    fn segment_override_for_op(&self, op: u8) -> Option<Segment> {
-        self.segment_override_for_op(op)
-    }
-
-    fn len(&self) -> AddressDiff<u64> {
-        <Self as LengthedInstruction>::len(&self)
-    }
-}
-
-impl X86Instruction for crate::protected_mode::Instruction {
-    fn opcode(&self) -> Opcode {
-        self.opcode()
-    }
-
-    fn operand(&self, i: u8) -> Operand {
-        self.operand(i)
-    }
-
-    fn operand_count(&self) -> u8 {
-        self.operand_count()
-    }
-
-    fn segment_override_for_op(&self, op: u8) -> Option<Segment> {
-        self.segment_override_for_op(op)
-    }
-
-    fn len(&self) -> AddressDiff<u64> {
-        let len = <Self as LengthedInstruction>::len(&self);
-
-        AddressDiff::from_const(len.to_const() as u64)
-    }
-}
-
-impl X86Instruction for crate::real_mode::Instruction {
-    fn opcode(&self) -> Opcode {
-        self.opcode()
-    }
-
-    fn operand(&self, i: u8) -> Operand {
-        self.operand(i)
-    }
-
-    fn operand_count(&self) -> u8 {
-        self.operand_count()
-    }
-
-    fn segment_override_for_op(&self, op: u8) -> Option<Segment> {
-        self.segment_override_for_op(op)
-    }
-
-    fn len(&self) -> AddressDiff<u64> {
-        let len = <Self as LengthedInstruction>::len(&self);
-
-        AddressDiff::from_const(len.to_const() as u64)
     }
 }
 

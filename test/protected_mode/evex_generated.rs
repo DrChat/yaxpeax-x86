@@ -42,7 +42,7 @@ fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str
             );
             // while we're at it, test that the instruction is as long, and no longer, than its
             // input
-            assert_eq!((0u32.wrapping_offset(instr.len()).to_linear()) as usize, data.len(), "instruction length is incorrect, wanted instruction {}", expected);
+            assert_eq!((0u64.wrapping_offset(instr.len()).to_linear()) as usize, data.len(), "instruction length is incorrect, wanted instruction {}", expected);
         },
         Err(e) => {
             assert!(false, "decode error ({}) for {} under decoder {}:\n  expected: {}\n", e, hex, decoder, expected);

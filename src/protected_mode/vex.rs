@@ -221,7 +221,7 @@ pub(crate) fn two_byte_vex<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
 >(words: &mut T, vex_byte: u8, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
-    let vex_start = words.offset() * 8 - 8;
+    let vex_start = words.offset() as u32 * 8 - 8;
     let p = vex_byte & 0x03;
     let p = match p {
         0x00 => VEXOpcodePrefix::None,
