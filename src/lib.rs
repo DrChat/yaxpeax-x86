@@ -839,58 +839,58 @@ pub enum Operand {
     RegisterMaskMergeSaeNoround(RegSpec, RegSpec, MergeMode),
     /// a memory access to a literal word address. it's extremely rare that a well-formed x86
     /// instruction uses this mode. as an example, `[0x1133]`
-    DisplacementU16(u16),
+    DisplacementU16(Segment, u16),
     /// a memory access to a literal qword address. it's relatively rare that a well-formed x86
     /// instruction uses this mode, but plausibe. for example, `fs:[0x14]`. segment overrides,
     /// however, are maintained on the instruction itself.
-    DisplacementU32(u32),
+    DisplacementU32(Segment, u32),
     /// a memory access to a literal qword address. it's relatively rare that a well-formed x86
     /// instruction uses this mode, but plausibe. for example, `gs:[0x14]`. segment overrides,
     /// however, are maintained on the instruction itself.
-    DisplacementU64(u64),
+    DisplacementU64(Segment, u64),
     /// a simple dereference of the address held in some register. for example: `[esi]`.
-    RegDeref(RegSpec),
+    RegDeref(Segment, RegSpec),
     /// a dereference of the address held in some register with offset. for example: `[esi + 0x14]`.
-    RegDisp(RegSpec, i32),
+    RegDisp(Segment, RegSpec, i32),
     /// a dereference of the address held in some register scaled by 1, 2, 4, or 8. this is almost always used with the `lea` instruction. for example: `[edx * 4]`.
-    RegScale(RegSpec, u8),
+    RegScale(Segment, RegSpec, u8),
     /// a dereference of the address from summing two registers. for example: `[ebp + rax]`
-    RegIndexBase(RegSpec, RegSpec),
+    RegIndexBase(Segment, RegSpec, RegSpec),
     /// a dereference of the address from summing two registers with offset. for example: `[edi + ecx + 0x40]`
-    RegIndexBaseDisp(RegSpec, RegSpec, i32),
+    RegIndexBaseDisp(Segment, RegSpec, RegSpec, i32),
     /// a dereference of the address held in some register scaled by 1, 2, 4, or 8 with offset. this is almost always used with the `lea` instruction. for example: `[eax * 4 + 0x30]`.
-    RegScaleDisp(RegSpec, u8, i32),
+    RegScaleDisp(Segment, RegSpec, u8, i32),
     /// a dereference of the address from summing a register and index register scaled by 1, 2, 4,
     /// or 8. for
     /// example: `[esi + ecx * 4]`
-    RegIndexBaseScale(RegSpec, RegSpec, u8),
+    RegIndexBaseScale(Segment, RegSpec, RegSpec, u8),
     /// a dereference of the address from summing a register and index register scaled by 1, 2, 4,
     /// or 8, with offset. for
     /// example: `[esi + ecx * 4 + 0x1234]`
-    RegIndexBaseScaleDisp(RegSpec, RegSpec, u8, i32),
+    RegIndexBaseScaleDisp(Segment, RegSpec, RegSpec, u8, i32),
     /// an `avx512` dereference of register with optional masking. for example: `[edx]{k3}`
-    RegDerefMasked(RegSpec, RegSpec),
+    RegDerefMasked(Segment, RegSpec, RegSpec),
     /// an `avx512` dereference of register plus offset, with optional masking. for example: `[esp + 0x40]{k3}`
-    RegDispMasked(RegSpec, i32, RegSpec),
+    RegDispMasked(Segment, RegSpec, i32, RegSpec),
     /// an `avx512` dereference of a register scaled by 1, 2, 4, or 8, with optional masking. this
     /// seems extraordinarily unlikely to occur in practice. for example: `[esi * 4]{k2}`
-    RegScaleMasked(RegSpec, u8, RegSpec),
+    RegScaleMasked(Segment, RegSpec, u8, RegSpec),
     /// an `avx512` dereference of a register plus index scaled by 1, 2, 4, or 8, with optional masking.
     /// for example: `[esi + eax * 4]{k6}`
-    RegIndexBaseMasked(RegSpec, RegSpec, RegSpec),
+    RegIndexBaseMasked(Segment, RegSpec, RegSpec, RegSpec),
     /// an `avx512` dereference of a register plus offset, with optional masking.  for example:
     /// `[esi + eax + 0x1313]{k6}`
-    RegIndexBaseDispMasked(RegSpec, RegSpec, i32, RegSpec),
+    RegIndexBaseDispMasked(Segment, RegSpec, RegSpec, i32, RegSpec),
     /// an `avx512` dereference of a register scaled by 1, 2, 4, or 8 plus offset, with optional
     /// masking. this seems extraordinarily unlikely to occur in practice. for example: `[esi *
     /// 4 + 0x1357]{k2}`
-    RegScaleDispMasked(RegSpec, u8, i32, RegSpec),
+    RegScaleDispMasked(Segment, RegSpec, u8, i32, RegSpec),
     /// an `avx512` dereference of a register plus index scaled by 1, 2, 4, or 8, with optional
     /// masking.  for example: `[esi + eax * 4]{k6}`
-    RegIndexBaseScaleMasked(RegSpec, RegSpec, u8, RegSpec),
+    RegIndexBaseScaleMasked(Segment, RegSpec, RegSpec, u8, RegSpec),
     /// an `avx512` dereference of a register plus index scaled by 1, 2, 4, or 8 and offset, with
     /// optional masking.  for example: `[esi + eax * 4 + 0x1313]{k6}`
-    RegIndexBaseScaleDispMasked(RegSpec, RegSpec, u8, i32, RegSpec),
+    RegIndexBaseScaleDispMasked(Segment, RegSpec, RegSpec, u8, i32, RegSpec),
     /// no operand. it is a bug for `yaxpeax-x86` to construct an `Operand` of this kind for public
     /// use; the instruction's `operand_count` should be reduced so as to make this invisible to
     /// library clients.
@@ -904,25 +904,25 @@ impl Operand {
     /// memory.
     pub fn is_memory(&self) -> bool {
         match self {
-            Operand::DisplacementU16(_)
-            | Operand::DisplacementU32(_)
-            | Operand::DisplacementU64(_)
-            | Operand::RegDeref(_)
-            | Operand::RegDisp(_, _)
-            | Operand::RegScale(_, _)
-            | Operand::RegIndexBase(_, _)
-            | Operand::RegIndexBaseDisp(_, _, _)
-            | Operand::RegScaleDisp(_, _, _)
-            | Operand::RegIndexBaseScale(_, _, _)
-            | Operand::RegIndexBaseScaleDisp(_, _, _, _)
-            | Operand::RegDerefMasked(_, _)
-            | Operand::RegDispMasked(_, _, _)
-            | Operand::RegScaleMasked(_, _, _)
-            | Operand::RegIndexBaseMasked(_, _, _)
-            | Operand::RegIndexBaseDispMasked(_, _, _, _)
-            | Operand::RegScaleDispMasked(_, _, _, _)
-            | Operand::RegIndexBaseScaleMasked(_, _, _, _)
-            | Operand::RegIndexBaseScaleDispMasked(_, _, _, _, _) => true,
+            Operand::DisplacementU16(_, _)
+            | Operand::DisplacementU32(_, _)
+            | Operand::DisplacementU64(_, _)
+            | Operand::RegDeref(_, _)
+            | Operand::RegDisp(_, _, _)
+            | Operand::RegScale(_, _, _)
+            | Operand::RegIndexBase(_, _, _)
+            | Operand::RegIndexBaseDisp(_, _, _, _)
+            | Operand::RegScaleDisp(_, _, _, _)
+            | Operand::RegIndexBaseScale(_, _, _, _)
+            | Operand::RegIndexBaseScaleDisp(_, _, _, _, _)
+            | Operand::RegDerefMasked(_, _, _)
+            | Operand::RegDispMasked(_, _, _, _)
+            | Operand::RegScaleMasked(_, _, _, _)
+            | Operand::RegIndexBaseMasked(_, _, _, _)
+            | Operand::RegIndexBaseDispMasked(_, _, _, _, _)
+            | Operand::RegScaleDispMasked(_, _, _, _, _)
+            | Operand::RegIndexBaseScaleMasked(_, _, _, _, _)
+            | Operand::RegIndexBaseScaleDispMasked(_, _, _, _, _, _) => true,
             Operand::ImmediateI8(_)
             | Operand::ImmediateU8(_)
             | Operand::ImmediateI16(_)

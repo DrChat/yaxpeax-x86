@@ -1877,78 +1877,58 @@ impl Instruction {
             OperandSpec::ImmI32 => Operand::ImmediateI32(inst.imm as i32),
             OperandSpec::ImmI64 => Operand::ImmediateI64(inst.imm as i64),
             OperandSpec::ImmInDispField => Operand::ImmediateU16(inst.disp as u16),
-            OperandSpec::DispU32 => Operand::DisplacementU32(inst.disp as u32),
-            OperandSpec::DispU64 => Operand::DisplacementU64(inst.disp as u64),
-            OperandSpec::Deref => {
-                Operand::RegDeref(inst.regs[1])
-            }
-            OperandSpec::Deref_esi => {
-                Operand::RegDeref(RegSpec::esi())
-            }
-            OperandSpec::Deref_edi => {
-                Operand::RegDeref(RegSpec::edi())
-            }
-            OperandSpec::Deref_rsi => {
-                Operand::RegDeref(RegSpec::rsi())
-            }
-            OperandSpec::Deref_rdi => {
-                Operand::RegDeref(RegSpec::rdi())
-            }
-            OperandSpec::RegDisp => {
-                Operand::RegDisp(inst.regs[1], inst.disp as i32)
-            }
-            OperandSpec::RegScale => {
-                Operand::RegScale(inst.regs[2], inst.scale)
-            }
-            OperandSpec::RegScaleDisp => {
-                Operand::RegScaleDisp(inst.regs[2], inst.scale, inst.disp as i32)
-            }
-            OperandSpec::RegIndexBaseScale => {
-                Operand::RegIndexBaseScale(inst.regs[1], inst.regs[2], inst.scale)
-            }
-            OperandSpec::RegIndexBaseScaleDisp => {
-                Operand::RegIndexBaseScaleDisp(inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32)
-            }
+            OperandSpec::DispU32 => Operand::DisplacementU32(unsafe { self.seg(i) }, inst.disp as u32),
+            OperandSpec::DispU64 => Operand::DisplacementU64(unsafe { self.seg(i) }, inst.disp as u64),
+            OperandSpec::Deref => Operand::RegDeref(unsafe { self.seg(i) }, inst.regs[1]),
+            OperandSpec::Deref_esi => Operand::RegDeref(unsafe { self.seg(i) }, RegSpec::esi()),
+            OperandSpec::Deref_edi => Operand::RegDeref(unsafe { self.seg(i) }, RegSpec::edi()),
+            OperandSpec::Deref_rsi => Operand::RegDeref(unsafe { self.seg(i) }, RegSpec::rsi()),
+            OperandSpec::Deref_rdi => Operand::RegDeref(unsafe { self.seg(i) }, RegSpec::rdi()),
+            OperandSpec::RegDisp => Operand::RegDisp(unsafe { self.seg(i) }, inst.regs[1], inst.disp as i32),
+            OperandSpec::RegScale => Operand::RegScale(unsafe { self.seg(i) }, inst.regs[2], inst.scale),
+            OperandSpec::RegScaleDisp => Operand::RegScaleDisp(unsafe { self.seg(i) }, inst.regs[2], inst.scale, inst.disp as i32),
+            OperandSpec::RegIndexBaseScale => Operand::RegIndexBaseScale(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale),
+            OperandSpec::RegIndexBaseScaleDisp => Operand::RegIndexBaseScaleDisp(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32),
             OperandSpec::Deref_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegDerefMasked(inst.regs[1], RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegDerefMasked(unsafe { self.seg(i) }, inst.regs[1], RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegDeref(inst.regs[1])
+                    Operand::RegDeref(unsafe { self.seg(i) }, inst.regs[1])
                 }
             }
             OperandSpec::RegDisp_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegDispMasked(inst.regs[1], inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegDispMasked(unsafe { self.seg(i) }, inst.regs[1], inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegDisp(inst.regs[1], inst.disp as i32)
+                    Operand::RegDisp(unsafe { self.seg(i) }, inst.regs[1], inst.disp as i32)
                 }
             }
             OperandSpec::RegScale_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegScaleMasked(inst.regs[2], inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegScaleMasked(unsafe { self.seg(i) }, inst.regs[2], inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegScale(inst.regs[2], inst.scale)
+                    Operand::RegScale(unsafe { self.seg(i) }, inst.regs[2], inst.scale)
                 }
             }
             OperandSpec::RegScaleDisp_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegScaleDispMasked(inst.regs[2], inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegScaleDispMasked(unsafe { self.seg(i) }, inst.regs[2], inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegScaleDisp(inst.regs[2], inst.scale, inst.disp as i32)
+                    Operand::RegScaleDisp(unsafe { self.seg(i) }, inst.regs[2], inst.scale, inst.disp as i32)
                 }
             }
             OperandSpec::RegIndexBaseScale_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegIndexBaseScaleMasked(inst.regs[1], inst.regs[2], inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegIndexBaseScaleMasked(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegIndexBaseScale(inst.regs[1], inst.regs[2], inst.scale)
+                    Operand::RegIndexBaseScale(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale)
                 }
             }
             OperandSpec::RegIndexBaseScaleDisp_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegIndexBaseScaleDispMasked(inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegIndexBaseScaleDispMasked(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegIndexBaseScaleDisp(inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32)
+                    Operand::RegIndexBaseScaleDisp(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32)
                 }
             }
         }
@@ -2002,6 +1982,55 @@ impl Instruction {
             imm: 0,
             operand_count: 0,
             operands: [OperandSpec::Nothing; 4],
+        }
+    }
+
+    /// get the `Segment` that will *actually* be used for accessing the operand at index `i`.
+    /// 
+    /// if the operand is not present, results are undefined
+    unsafe fn seg(&self, op: u8) -> Segment {
+        match self.opcode {
+            Opcode::STOS |
+            Opcode::SCAS => {
+                if op == 0 {
+                    Segment::ES
+                } else {
+                    unreachable_unchecked();
+                }
+            }
+            Opcode::LODS => {
+                if op == 1 {
+                    self.prefixes.segment
+                } else {
+                    unreachable_unchecked();
+                }
+            }
+            Opcode::MOVS => {
+                if op == 0 {
+                    Segment::ES
+                } else if op == 1 {
+                    self.prefixes.segment
+                } else {
+                    unreachable_unchecked();
+                }
+            }
+            Opcode::CMPS => {
+                if op == 0 {
+                    self.prefixes.segment
+                } else if op == 1 {
+                    Segment::ES
+                } else {
+                    unreachable_unchecked();
+                }
+            },
+            _ => {
+                // most operands are pretty simple:
+                if self.operands.get_unchecked(op as usize).is_memory() {
+                    self.prefixes.segment
+                } else {
+                    unreachable_unchecked();
+                }
+            }
         }
     }
 

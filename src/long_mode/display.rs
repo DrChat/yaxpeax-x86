@@ -167,32 +167,32 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
                 f.write_str("{sae}")?;
                 Ok(())
             }
-            &Operand::DisplacementU16(imm) => {
+            &Operand::DisplacementU16(_, imm) => {
                 write!(f, "[{}]", colors.address(u16_hex(imm)))
             }
-            &Operand::DisplacementU32(imm) => {
+            &Operand::DisplacementU32(_, imm) => {
                 write!(f, "[{}]", colors.address(u32_hex(imm)))
             }
-            &Operand::DisplacementU64(imm) => {
+            &Operand::DisplacementU64(_, imm) => {
                 write!(f, "[{}]", colors.address(u64_hex(imm)))
             }
-            &Operand::RegDisp(ref spec, disp) => {
+            &Operand::RegDisp(_, ref spec, disp) => {
                 write!(f, "[{} ", regspec_label(spec))?;
                 format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
                 write!(f, "]")
             },
-            &Operand::RegDeref(ref spec) => {
+            &Operand::RegDeref(_, ref spec) => {
                 f.write_str("[")?;
                 f.write_str(regspec_label(spec))?;
                 f.write_str("]")
             },
-            &Operand::RegScale(ref spec, scale) => {
+            &Operand::RegScale(_, ref spec, scale) => {
                 write!(f, "[{} * {}]",
                     regspec_label(spec),
                     colors.number(scale)
                 )
             },
-            &Operand::RegScaleDisp(ref spec, scale, disp) => {
+            &Operand::RegScaleDisp(_, ref spec, scale, disp) => {
                 write!(f, "[{} * {} ",
                     regspec_label(spec),
                     colors.number(scale),
@@ -200,14 +200,14 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
                 format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
                 write!(f, "]")
             },
-            &Operand::RegIndexBase(ref base, ref index) => {
+            &Operand::RegIndexBase(_, ref base, ref index) => {
                 f.write_str("[")?;
                 f.write_str(regspec_label(base))?;
                 f.write_str(" + ")?;
                 f.write_str(regspec_label(index))?;
                 f.write_str("]")
             }
-            &Operand::RegIndexBaseDisp(ref base, ref index, disp) => {
+            &Operand::RegIndexBaseDisp(_, ref base, ref index, disp) => {
                 write!(f, "[{} + {} ",
                     regspec_label(base),
                     regspec_label(index),
@@ -215,14 +215,14 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
                 format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
                 write!(f, "]")
             },
-            &Operand::RegIndexBaseScale(ref base, ref index, scale) => {
+            &Operand::RegIndexBaseScale(_, ref base, ref index, scale) => {
                 write!(f, "[{} + {} * {}]",
                     regspec_label(base),
                     regspec_label(index),
                     colors.number(scale)
                 )
             }
-            &Operand::RegIndexBaseScaleDisp(ref base, ref index, scale, disp) => {
+            &Operand::RegIndexBaseScaleDisp(_, ref base, ref index, scale, disp) => {
                 write!(f, "[{} + {} * {} ",
                     regspec_label(base),
                     regspec_label(index),
@@ -231,26 +231,26 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
                 format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
                 write!(f, "]")
             },
-            &Operand::RegDispMasked(ref spec, disp, ref mask_reg) => {
+            &Operand::RegDispMasked(_, ref spec, disp, ref mask_reg) => {
                 write!(f, "[{} ", regspec_label(spec))?;
                 format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
                 write!(f, "]")?;
                 write!(f, "{{{}}}", regspec_label(mask_reg))
             },
-            &Operand::RegDerefMasked(ref spec, ref mask_reg) => {
+            &Operand::RegDerefMasked(_, ref spec, ref mask_reg) => {
                 f.write_str("[")?;
                 f.write_str(regspec_label(spec))?;
                 f.write_str("]")?;
                 write!(f, "{{{}}}", regspec_label(mask_reg))
             },
-            &Operand::RegScaleMasked(ref spec, scale, ref mask_reg) => {
+            &Operand::RegScaleMasked(_, ref spec, scale, ref mask_reg) => {
                 write!(f, "[{} * {}]",
                     regspec_label(spec),
                     colors.number(scale)
                 )?;
                 write!(f, "{{{}}}", regspec_label(mask_reg))
             },
-            &Operand::RegScaleDispMasked(ref spec, scale, disp, ref mask_reg) => {
+            &Operand::RegScaleDispMasked(_, ref spec, scale, disp, ref mask_reg) => {
                 write!(f, "[{} * {} ",
                     regspec_label(spec),
                     colors.number(scale),
@@ -259,7 +259,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
                 write!(f, "]")?;
                 write!(f, "{{{}}}", regspec_label(mask_reg))
             },
-            &Operand::RegIndexBaseMasked(ref base, ref index, ref mask_reg) => {
+            &Operand::RegIndexBaseMasked(_, ref base, ref index, ref mask_reg) => {
                 f.write_str("[")?;
                 f.write_str(regspec_label(base))?;
                 f.write_str(" + ")?;
@@ -267,7 +267,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
                 f.write_str("]")?;
                 write!(f, "{{{}}}", regspec_label(mask_reg))
             }
-            &Operand::RegIndexBaseDispMasked(ref base, ref index, disp, ref mask_reg) => {
+            &Operand::RegIndexBaseDispMasked(_, ref base, ref index, disp, ref mask_reg) => {
                 write!(f, "[{} + {} ",
                     regspec_label(base),
                     regspec_label(index),
@@ -276,7 +276,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
                 write!(f, "]")?;
                 write!(f, "{{{}}}", regspec_label(mask_reg))
             },
-            &Operand::RegIndexBaseScaleMasked(ref base, ref index, scale, ref mask_reg) => {
+            &Operand::RegIndexBaseScaleMasked(_, ref base, ref index, scale, ref mask_reg) => {
                 write!(f, "[{} + {} * {}]",
                     regspec_label(base),
                     regspec_label(index),
@@ -284,7 +284,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
                 )?;
                 write!(f, "{{{}}}", regspec_label(mask_reg))
             }
-            &Operand::RegIndexBaseScaleDispMasked(ref base, ref index, scale, disp, ref mask_reg) => {
+            &Operand::RegIndexBaseScaleDispMasked(_, ref base, ref index, scale, disp, ref mask_reg) => {
                 write!(f, "[{} + {} * {} ",
                     regspec_label(base),
                     regspec_label(index),

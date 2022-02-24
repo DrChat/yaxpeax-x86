@@ -1,5 +1,5 @@
 use yaxpeax_x86::long_mode::{InstDecoder, Operand, RegSpec};
-use yaxpeax_x86::MemoryAccessSize;
+use yaxpeax_x86::{MemoryAccessSize, Segment};
 
 #[test]
 fn register_widths() {
@@ -15,7 +15,7 @@ fn register_widths() {
 fn memory_widths() {
     // the register operand directly doesn't report a size - it comes from the `Instruction` for
     // which this is an operand.
-    assert_eq!(Operand::RegDeref(RegSpec::rsp()).width(), None);
+    assert_eq!(Operand::RegDeref(Segment::DS, RegSpec::rsp()).width(), None);
 
     fn mem_size_of(data: &[u8]) -> MemoryAccessSize {
         let decoder = InstDecoder::default();
