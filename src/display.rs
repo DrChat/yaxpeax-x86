@@ -1,3 +1,4 @@
+use crate::DispWidth;
 use crate::{safer_unchecked::GetSaferUnchecked, MergeMode, Opcode, Operand, RegSpec, Segment};
 use core::fmt;
 
@@ -131,129 +132,45 @@ impl<T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
                 f.write_str("{sae}")?;
                 Ok(())
             }
-            &Operand::DisplacementU16(_, imm) => {
-                write!(f, "[{}]", colors.address(u16_hex(imm)))
-            }
-            &Operand::DisplacementU32(_, imm) => {
-                write!(f, "[{}]", colors.address(u32_hex(imm)))
-            }
-            &Operand::DisplacementU64(_, imm) => {
-                write!(f, "[{}]", colors.address(u64_hex(imm)))
-            }
-            &Operand::RegDisp(_, ref spec, disp) => {
-                write!(f, "[{} ", regspec_label(spec))?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")
-            }
-            &Operand::RegDeref(_, ref spec) => {
+            &Operand::Memory { seg: _, sz: _, base, index, scale, disp, mask } => {
+                let mut spacer = false;
+
                 f.write_str("[")?;
-                f.write_str(regspec_label(spec))?;
-                f.write_str("]")
-            }
-            &Operand::RegScale(_, ref spec, scale) => {
-                write!(f, "[{} * {}]", regspec_label(spec), colors.number(scale))
-            }
-            &Operand::RegScaleDisp(_, ref spec, scale, disp) => {
-                write!(f, "[{} * {} ", regspec_label(spec), colors.number(scale),)?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")
-            }
-            &Operand::RegIndexBase(_, ref base, ref index) => {
-                f.write_str("[")?;
-                f.write_str(regspec_label(base))?;
-                f.write_str(" + ")?;
-                f.write_str(regspec_label(index))?;
-                f.write_str("]")
-            }
-            &Operand::RegIndexBaseDisp(_, ref base, ref index, disp) => {
-                write!(f, "[{} + {} ", regspec_label(base), regspec_label(index),)?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")
-            }
-            &Operand::RegIndexBaseScale(_, ref base, ref index, scale) => {
-                write!(
-                    f,
-                    "[{} + {} * {}]",
-                    regspec_label(base),
-                    regspec_label(index),
-                    colors.number(scale)
-                )
-            }
-            &Operand::RegIndexBaseScaleDisp(_, ref base, ref index, scale, disp) => {
-                write!(
-                    f,
-                    "[{} + {} * {} ",
-                    regspec_label(base),
-                    regspec_label(index),
-                    colors.number(scale),
-                )?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")
-            }
-            &Operand::RegDispMasked(_, ref spec, disp, ref mask_reg) => {
-                write!(f, "[{} ", regspec_label(spec))?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            }
-            &Operand::RegDerefMasked(_, ref spec, ref mask_reg) => {
-                f.write_str("[")?;
-                f.write_str(regspec_label(spec))?;
+                if let Some(base) = &base {
+                    f.write_str(regspec_label(base))?;
+                    spacer = true;
+                }
+                if let Some(index) = &index {
+                    // FIXME: This is messy.
+                    if spacer {
+                        f.write_str(" + ")?;
+                    }
+
+                    f.write_str(regspec_label(index))?;
+                    spacer = true;
+
+                    if let Some(scale) = scale {
+                        write!(f, " * {}", colors.number(scale))?;
+                    }
+                }
+                if let Some(disp) = &disp {
+                    if spacer {
+                        f.write_str(" ")?;
+                    }
+
+                    match *disp {
+                        DispWidth::I32(disp) => format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?,
+                        DispWidth::U16(disp) => write!(f, "{}", colors.address(u16_hex(disp)))?,
+                        DispWidth::U32(disp) => write!(f, "{}", colors.address(u32_hex(disp)))?,
+                        DispWidth::U64(disp) => write!(f, "{}", colors.address(u64_hex(disp)))?,
+                    }
+                }
                 f.write_str("]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            }
-            &Operand::RegScaleMasked(_, ref spec, scale, ref mask_reg) => {
-                write!(f, "[{} * {}]", regspec_label(spec), colors.number(scale))?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            }
-            &Operand::RegScaleDispMasked(_, ref spec, scale, disp, ref mask_reg) => {
-                write!(f, "[{} * {} ", regspec_label(spec), colors.number(scale),)?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            }
-            &Operand::RegIndexBaseMasked(_, ref base, ref index, ref mask_reg) => {
-                f.write_str("[")?;
-                f.write_str(regspec_label(base))?;
-                f.write_str(" + ")?;
-                f.write_str(regspec_label(index))?;
-                f.write_str("]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            }
-            &Operand::RegIndexBaseDispMasked(_, ref base, ref index, disp, ref mask_reg) => {
-                write!(f, "[{} + {} ", regspec_label(base), regspec_label(index),)?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            }
-            &Operand::RegIndexBaseScaleMasked(_, ref base, ref index, scale, ref mask_reg) => {
-                write!(
-                    f,
-                    "[{} + {} * {}]",
-                    regspec_label(base),
-                    regspec_label(index),
-                    colors.number(scale)
-                )?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            }
-            &Operand::RegIndexBaseScaleDispMasked(
-                _,
-                ref base,
-                ref index,
-                scale,
-                disp,
-                ref mask_reg,
-            ) => {
-                write!(
-                    f,
-                    "[{} + {} * {} ",
-                    regspec_label(base),
-                    regspec_label(index),
-                    colors.number(scale),
-                )?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
+                if let Some(mask) = &mask {
+                    write!(f, "{{{}}}", regspec_label(mask))?;
+                }
+
+                Ok(())
             }
             &Operand::Nothing => Ok(()),
         }

@@ -25,7 +25,7 @@
 //! library-friendly `Operand` and `RegSpec` types:
 //!
 //! ```
-//! use yaxpeax_x86::amd64::{InstDecoder, Operand, RegSpec};
+//! use yaxpeax_x86::amd64::{InstDecoder, MemoryAccessSize, Operand, Segment, RegSpec};
 //!
 //! let decoder = yaxpeax_x86::amd64::InstDecoder::default();
 //!
@@ -35,7 +35,15 @@
 //!
 //! assert_eq!(Operand::Register(RegSpec::eax()), inst.operand(0));
 //! assert_eq!("eax", inst.operand(0).to_string());
-//! assert_eq!(Operand::RegDeref(RegSpec::rcx()), inst.operand(1));
+//! assert_eq!(Operand::Memory {
+//!     seg: Segment::DS,
+//!     sz: MemoryAccessSize::new(4),
+//!     base: Some(RegSpec::rcx()),
+//!     index: None,
+//!     scale: None,
+//!     disp: None,
+//!     mask: None
+//! }, inst.operand(1));
 //!
 //! // an operand in isolation does not know the size of memory it references, if any
 //! assert_eq!("[rcx]", inst.operand(1).to_string());
@@ -137,10 +145,22 @@ const MEM_SIZE_STRINGS: [&'static str; 64] = [
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ptr", "zmmword",
 ];
 
+#[derive(Clone, Copy, PartialEq)]
 pub struct MemoryAccessSize {
     size: u8,
 }
 impl MemoryAccessSize {
+    /// construct a new MemoryAccessSize, useful for comparisons.
+    /// 
+    /// will panic if the size is above 63 (wherein 63 is an "indeterminate size")
+    pub fn new(size: u8) -> Self {
+        if size > 63 {
+            panic!("invalid size");
+        }
+
+        Self { size }
+    }
+
     /// return the number of bytes referenced by this memory access.
     ///
     /// if the number of bytes cannot be confidently known by the instruction in isolation (as is
@@ -794,6 +814,14 @@ impl SaeMode {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DispWidth {
+    I32(i32),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+}
+
 /// an operand for an `x86` instruction.
 ///
 /// `Operand::Nothing` should be unreachable in practice; any such instructions should have an
@@ -837,60 +865,24 @@ pub enum Operand {
     /// if the mask register is `k0`, there is no masking applied, and the default x86 operation is
     /// `MergeMode::Merge`.
     RegisterMaskMergeSaeNoround(RegSpec, RegSpec, MergeMode),
-    /// a memory access to a literal word address. it's extremely rare that a well-formed x86
-    /// instruction uses this mode. as an example, `[0x1133]`
-    DisplacementU16(Segment, u16),
-    /// a memory access to a literal qword address. it's relatively rare that a well-formed x86
-    /// instruction uses this mode, but plausibe. for example, `fs:[0x14]`. segment overrides,
-    /// however, are maintained on the instruction itself.
-    DisplacementU32(Segment, u32),
-    /// a memory access to a literal qword address. it's relatively rare that a well-formed x86
-    /// instruction uses this mode, but plausibe. for example, `gs:[0x14]`. segment overrides,
-    /// however, are maintained on the instruction itself.
-    DisplacementU64(Segment, u64),
-    /// a simple dereference of the address held in some register. for example: `[esi]`.
-    RegDeref(Segment, RegSpec),
-    /// a dereference of the address held in some register with offset. for example: `[esi + 0x14]`.
-    RegDisp(Segment, RegSpec, i32),
-    /// a dereference of the address held in some register scaled by 1, 2, 4, or 8. this is almost always used with the `lea` instruction. for example: `[edx * 4]`.
-    RegScale(Segment, RegSpec, u8),
-    /// a dereference of the address from summing two registers. for example: `[ebp + rax]`
-    RegIndexBase(Segment, RegSpec, RegSpec),
-    /// a dereference of the address from summing two registers with offset. for example: `[edi + ecx + 0x40]`
-    RegIndexBaseDisp(Segment, RegSpec, RegSpec, i32),
-    /// a dereference of the address held in some register scaled by 1, 2, 4, or 8 with offset. this is almost always used with the `lea` instruction. for example: `[eax * 4 + 0x30]`.
-    RegScaleDisp(Segment, RegSpec, u8, i32),
-    /// a dereference of the address from summing a register and index register scaled by 1, 2, 4,
-    /// or 8. for
-    /// example: `[esi + ecx * 4]`
-    RegIndexBaseScale(Segment, RegSpec, RegSpec, u8),
-    /// a dereference of the address from summing a register and index register scaled by 1, 2, 4,
-    /// or 8, with offset. for
-    /// example: `[esi + ecx * 4 + 0x1234]`
-    RegIndexBaseScaleDisp(Segment, RegSpec, RegSpec, u8, i32),
-    /// an `avx512` dereference of register with optional masking. for example: `[edx]{k3}`
-    RegDerefMasked(Segment, RegSpec, RegSpec),
-    /// an `avx512` dereference of register plus offset, with optional masking. for example: `[esp + 0x40]{k3}`
-    RegDispMasked(Segment, RegSpec, i32, RegSpec),
-    /// an `avx512` dereference of a register scaled by 1, 2, 4, or 8, with optional masking. this
-    /// seems extraordinarily unlikely to occur in practice. for example: `[esi * 4]{k2}`
-    RegScaleMasked(Segment, RegSpec, u8, RegSpec),
-    /// an `avx512` dereference of a register plus index scaled by 1, 2, 4, or 8, with optional masking.
-    /// for example: `[esi + eax * 4]{k6}`
-    RegIndexBaseMasked(Segment, RegSpec, RegSpec, RegSpec),
-    /// an `avx512` dereference of a register plus offset, with optional masking.  for example:
-    /// `[esi + eax + 0x1313]{k6}`
-    RegIndexBaseDispMasked(Segment, RegSpec, RegSpec, i32, RegSpec),
-    /// an `avx512` dereference of a register scaled by 1, 2, 4, or 8 plus offset, with optional
-    /// masking. this seems extraordinarily unlikely to occur in practice. for example: `[esi *
-    /// 4 + 0x1357]{k2}`
-    RegScaleDispMasked(Segment, RegSpec, u8, i32, RegSpec),
-    /// an `avx512` dereference of a register plus index scaled by 1, 2, 4, or 8, with optional
-    /// masking.  for example: `[esi + eax * 4]{k6}`
-    RegIndexBaseScaleMasked(Segment, RegSpec, RegSpec, u8, RegSpec),
-    /// an `avx512` dereference of a register plus index scaled by 1, 2, 4, or 8 and offset, with
-    /// optional masking.  for example: `[esi + eax * 4 + 0x1313]{k6}`
-    RegIndexBaseScaleDispMasked(Segment, RegSpec, RegSpec, u8, i32, RegSpec),
+    /// a memory access, with the simplest form being e.g. `[0x1133]`, and the most complex form being
+    /// `fs:[esi + eax + 0x1313]{k6}`.
+    Memory {
+        /// The segment base for this memory access. Usually `DS` (implicitly specified).
+        seg: Segment,
+        /// The size of the memory access.
+        sz: MemoryAccessSize,
+        /// The base register for the memory access.
+        base: Option<RegSpec>,
+        /// The index register for the memory access. Multiplied by `scale`.
+        index: Option<RegSpec>,
+        /// The scale applied to the `index` register.
+        scale: Option<u8>,
+        /// The displacement relative to the base and index.
+        disp: Option<DispWidth>,
+        /// The mask register, if applicable (AVX512).
+        mask: Option<RegSpec>,
+    },
     /// no operand. it is a bug for `yaxpeax-x86` to construct an `Operand` of this kind for public
     /// use; the instruction's `operand_count` should be reduced so as to make this invisible to
     /// library clients.
@@ -904,25 +896,7 @@ impl Operand {
     /// memory.
     pub fn is_memory(&self) -> bool {
         match self {
-            Operand::DisplacementU16(_, _)
-            | Operand::DisplacementU32(_, _)
-            | Operand::DisplacementU64(_, _)
-            | Operand::RegDeref(_, _)
-            | Operand::RegDisp(_, _, _)
-            | Operand::RegScale(_, _, _)
-            | Operand::RegIndexBase(_, _, _)
-            | Operand::RegIndexBaseDisp(_, _, _, _)
-            | Operand::RegScaleDisp(_, _, _, _)
-            | Operand::RegIndexBaseScale(_, _, _, _)
-            | Operand::RegIndexBaseScaleDisp(_, _, _, _, _)
-            | Operand::RegDerefMasked(_, _, _)
-            | Operand::RegDispMasked(_, _, _, _)
-            | Operand::RegScaleMasked(_, _, _, _)
-            | Operand::RegIndexBaseMasked(_, _, _, _)
-            | Operand::RegIndexBaseDispMasked(_, _, _, _, _)
-            | Operand::RegScaleDispMasked(_, _, _, _, _)
-            | Operand::RegIndexBaseScaleMasked(_, _, _, _, _)
-            | Operand::RegIndexBaseScaleDispMasked(_, _, _, _, _, _) => true,
+            Operand::Memory { .. } => true,
             Operand::ImmediateI8(_)
             | Operand::ImmediateU8(_)
             | Operand::ImmediateI16(_)
@@ -2524,3 +2498,26 @@ impl Opcode {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::{Operand, Segment, MemoryAccessSize, RegSpec};
+
+    #[test]
+    fn memory_width() {
+        // the register operand directly doesn't report a size - it comes from the `Instruction` for
+        // which this is an operand.
+        assert_eq!(
+            Operand::Memory {
+                seg: Segment::DS,
+                sz: MemoryAccessSize { size: 0 },
+                base: Some(RegSpec::rsp()),
+                index: None,
+                scale: None,
+                disp: None,
+                mask: None
+            }
+            .width(),
+            None
+        );
+    }}

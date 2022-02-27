@@ -5,7 +5,7 @@ mod display;
 pub mod uarch;
 
 pub use crate::{ConditionCode, Opcode, Operand, MemoryAccessSize, MergeMode, RegSpec, RegisterClass, register_class, SaeMode, Segment};
-use crate::RegisterBank;
+use crate::{RegisterBank, DispWidth};
 
 #[cfg(feature = "fmt")]
 pub use self::display::{DisplayStyle, InstructionDisplayer};
@@ -1813,142 +1813,166 @@ impl Instruction {
         assert!(i < 4);
 
         let inst = self;
-        match self.operands[i as usize] {
-            OperandSpec::Nothing => {
-                Operand::Nothing
-            }
-            // the register in modrm_rrr
-            OperandSpec::RegRRR => {
-                Operand::Register(inst.regs[0])
-            }
-            OperandSpec::RegRRR_maskmerge => {
-                Operand::RegisterMaskMerge(
-                    inst.regs[0],
-                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
-                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
-                )
-            }
-            OperandSpec::RegRRR_maskmerge_sae => {
-                Operand::RegisterMaskMergeSae(
-                    inst.regs[0],
-                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
-                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
-                    SaeMode::from(inst.prefixes.evex_unchecked().vex().l(), inst.prefixes.evex_unchecked().lp()),
-                )
-            }
-            OperandSpec::RegRRR_maskmerge_sae_noround => {
-                Operand::RegisterMaskMergeSaeNoround(
-                    inst.regs[0],
-                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
-                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
-                )
-            }
-            // the register in modrm_mmm (eg modrm mod bits were 11)
-            OperandSpec::RegMMM => {
-                Operand::Register(inst.regs[1])
-            }
-            OperandSpec::RegMMM_maskmerge => {
-                Operand::RegisterMaskMerge(
-                    inst.regs[1],
-                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
-                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
-                )
-            }
-            OperandSpec::RegMMM_maskmerge_sae_noround => {
-                Operand::RegisterMaskMergeSaeNoround(
-                    inst.regs[1],
-                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
-                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
-                )
-            }
-            OperandSpec::RegVex => {
-                Operand::Register(inst.regs[3])
-            }
-            OperandSpec::RegVex_maskmerge => {
-                Operand::RegisterMaskMerge(
-                    inst.regs[3],
-                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
-                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
-                )
-            }
-            OperandSpec::Reg4 => {
-                Operand::Register(RegSpec { num: inst.imm as u8, bank: inst.regs[3].bank })
-            }
-            OperandSpec::ImmI8 => Operand::ImmediateI8(inst.imm as i8),
-            OperandSpec::ImmU8 => Operand::ImmediateU8(inst.imm as u8),
-            OperandSpec::ImmI16 => Operand::ImmediateI16(inst.imm as i16),
-            OperandSpec::ImmU16 => Operand::ImmediateU16(inst.imm as u16),
-            OperandSpec::ImmI32 => Operand::ImmediateI32(inst.imm as i32),
-            OperandSpec::ImmInDispField => Operand::ImmediateU16(inst.disp as u16),
-            OperandSpec::DispU16 => Operand::DisplacementU16(unsafe { self.seg(i) }, inst.disp as u16),
-            OperandSpec::DispU32 => Operand::DisplacementU32(unsafe { self.seg(i) }, inst.disp),
-            OperandSpec::Deref => Operand::RegDeref(unsafe { self.seg(i) }, inst.regs[1]),
-            OperandSpec::Deref_si => Operand::RegDeref(unsafe { self.seg(i) }, RegSpec::si()),
-            OperandSpec::Deref_di => Operand::RegDeref(unsafe { self.seg(i) }, RegSpec::di()),
-            OperandSpec::Deref_esi => Operand::RegDeref(unsafe { self.seg(i) }, RegSpec::esi()),
-            OperandSpec::Deref_edi => Operand::RegDeref(unsafe { self.seg(i) }, RegSpec::edi()),
-            OperandSpec::RegDisp => Operand::RegDisp(unsafe { self.seg(i) }, inst.regs[1], inst.disp as i32),
-            OperandSpec::RegScale => Operand::RegScale(unsafe { self.seg(i) }, inst.regs[2], inst.scale),
-            OperandSpec::RegIndexBase => Operand::RegIndexBase(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2]),
-            OperandSpec::RegIndexBaseDisp => Operand::RegIndexBaseDisp(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.disp as i32),
-            OperandSpec::RegScaleDisp => Operand::RegScaleDisp(unsafe { self.seg(i) }, inst.regs[2], inst.scale, inst.disp as i32),
-            OperandSpec::RegIndexBaseScale => Operand::RegIndexBaseScale(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale),
-            OperandSpec::RegIndexBaseScaleDisp => Operand::RegIndexBaseScaleDisp(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32),
-            OperandSpec::Deref_mask => {
-                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegDerefMasked(unsafe { self.seg(i) }, inst.regs[1], RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
-                } else {
-                    Operand::RegDeref(unsafe { self.seg(i) }, inst.regs[1])
+        match self.operands[i as usize].is_memory() {
+            false => {
+                match self.operands[i as usize] {
+                    OperandSpec::Nothing => {
+                        Operand::Nothing
+                    }
+                    // the register in modrm_rrr
+                    OperandSpec::RegRRR => {
+                        Operand::Register(inst.regs[0])
+                    }
+                    OperandSpec::RegRRR_maskmerge => {
+                        Operand::RegisterMaskMerge(
+                            inst.regs[0],
+                            RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                            MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                        )
+                    }
+                    OperandSpec::RegRRR_maskmerge_sae => {
+                        Operand::RegisterMaskMergeSae(
+                            inst.regs[0],
+                            RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                            MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                            SaeMode::from(inst.prefixes.evex_unchecked().vex().l(), inst.prefixes.evex_unchecked().lp()),
+                        )
+                    }
+                    OperandSpec::RegRRR_maskmerge_sae_noround => {
+                        Operand::RegisterMaskMergeSaeNoround(
+                            inst.regs[0],
+                            RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                            MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                        )
+                    }
+                    // the register in modrm_mmm (eg modrm mod bits were 11)
+                    OperandSpec::RegMMM => {
+                        Operand::Register(inst.regs[1])
+                    }
+                    OperandSpec::RegMMM_maskmerge => {
+                        Operand::RegisterMaskMerge(
+                            inst.regs[1],
+                            RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                            MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                        )
+                    }
+                    OperandSpec::RegMMM_maskmerge_sae_noround => {
+                        Operand::RegisterMaskMergeSaeNoround(
+                            inst.regs[1],
+                            RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                            MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                        )
+                    }
+                    OperandSpec::RegVex => {
+                        Operand::Register(inst.regs[3])
+                    }
+                    OperandSpec::RegVex_maskmerge => {
+                        Operand::RegisterMaskMerge(
+                            inst.regs[3],
+                            RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                            MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                        )
+                    }
+                    OperandSpec::Reg4 => {
+                        Operand::Register(RegSpec { num: inst.imm as u8, bank: inst.regs[3].bank })
+                    }
+                    OperandSpec::ImmI8 => Operand::ImmediateI8(inst.imm as i8),
+                    OperandSpec::ImmU8 => Operand::ImmediateU8(inst.imm as u8),
+                    OperandSpec::ImmI16 => Operand::ImmediateI16(inst.imm as i16),
+                    OperandSpec::ImmU16 => Operand::ImmediateU16(inst.imm as u16),
+                    OperandSpec::ImmI32 => Operand::ImmediateI32(inst.imm as i32),
+                    OperandSpec::ImmInDispField => Operand::ImmediateU16(inst.disp as u16),
+                    _ => unsafe { unreachable_unchecked() },
                 }
-            }
-            OperandSpec::RegDisp_mask => {
-                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegDispMasked(unsafe { self.seg(i) }, inst.regs[1], inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
-                } else {
-                    Operand::RegDisp(unsafe { self.seg(i) }, inst.regs[1], inst.disp as i32)
-                }
-            }
-            OperandSpec::RegScale_mask => {
-                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegScaleMasked(unsafe { self.seg(i) }, inst.regs[2], inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
-                } else {
-                    Operand::RegScale(unsafe { self.seg(i) }, inst.regs[2], inst.scale)
-                }
-            }
-            OperandSpec::RegScaleDisp_mask => {
-                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegScaleDispMasked(unsafe { self.seg(i) }, inst.regs[2], inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
-                } else {
-                    Operand::RegScaleDisp(unsafe { self.seg(i) }, inst.regs[2], inst.scale, inst.disp as i32)
-                }
-            }
-            OperandSpec::RegIndexBase_mask => {
-                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegIndexBaseMasked(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
-                } else {
-                    Operand::RegIndexBase(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2])
-                }
-            }
-            OperandSpec::RegIndexBaseDisp_mask => {
-                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegIndexBaseDispMasked(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
-                } else {
-                    Operand::RegIndexBaseDisp(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.disp as i32)
-                }
-            }
-            OperandSpec::RegIndexBaseScale_mask => {
-                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegIndexBaseScaleMasked(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
-                } else {
-                    Operand::RegIndexBaseScale(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale)
-                }
-            }
-            OperandSpec::RegIndexBaseScaleDisp_mask => {
-                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegIndexBaseScaleDispMasked(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
-                } else {
-                    Operand::RegIndexBaseScaleDisp(unsafe { self.seg(i) }, inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32)
-                }
+            },
+            true => {
+                let seg = unsafe { self.seg(i) };
+                let sz = MemoryAccessSize { size: self.mem_size };
+                let mut base = None;
+                let mut index = None;
+                let mut scale = None;
+                let mut disp = None;
+                let mut mask = None;
+
+                match self.operands[i as usize] {
+                    OperandSpec::DispU16 => { disp = Some(DispWidth::U16(inst.disp as u16)); },
+                    OperandSpec::DispU32 => { disp = Some(DispWidth::U32(inst.disp as u32)); },
+                    OperandSpec::Deref => { base = Some(inst.regs[1]); },
+                    OperandSpec::Deref_si => { base = Some(RegSpec::si()); },
+                    OperandSpec::Deref_di => { base = Some(RegSpec::di()); },
+                    OperandSpec::Deref_esi => { base = Some(RegSpec::esi()); },
+                    OperandSpec::Deref_edi => { base = Some(RegSpec::edi()); },
+                    OperandSpec::RegDisp => { base = Some(inst.regs[1]); disp = Some(DispWidth::I32(inst.disp as i32)) },
+                    OperandSpec::RegScale => { index = Some(inst.regs[2]); scale = Some(inst.scale); },
+                    OperandSpec::RegIndexBase => { base = Some(inst.regs[1]); index = Some(inst.regs[2]); },
+                    OperandSpec::RegIndexBaseDisp => { base = Some(inst.regs[1]); index = Some(inst.regs[2]); disp = Some(DispWidth::I32(inst.disp as i32)); },
+                    OperandSpec::RegScaleDisp => { index = Some(inst.regs[2]); scale = Some(inst.scale); disp = Some(DispWidth::I32(inst.disp as i32)); },
+                    OperandSpec::RegIndexBaseScale => { base = Some(inst.regs[1]); index = Some(inst.regs[2]); scale = Some(inst.scale); },
+                    OperandSpec::RegIndexBaseScaleDisp => { base = Some(inst.regs[1]); index = Some(inst.regs[2]); scale = Some(inst.scale); disp = Some(DispWidth::I32(inst.disp as i32)); },
+                    OperandSpec::Deref_mask => {
+                        base = Some(inst.regs[1]);
+                        if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            mask = Some(RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()));
+                        }
+                    },
+                    OperandSpec::RegDisp_mask => {
+                        base = Some(inst.regs[1]);
+                        disp = Some(DispWidth::I32(inst.disp as i32));
+                        if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            mask = Some(RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()));
+                        }
+                    }
+                    OperandSpec::RegScale_mask => {
+                        index = Some(inst.regs[2]);
+                        scale = Some(inst.scale);
+                        if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            mask = Some(RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()));
+                        }
+                    }
+                    OperandSpec::RegScaleDisp_mask => {
+                        index = Some(inst.regs[2]);
+                        scale = Some(inst.scale);
+                        disp = Some(DispWidth::I32(inst.disp as i32));
+                        if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            mask = Some(RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()));
+                        }
+                    }
+                    OperandSpec::RegIndexBase_mask => {
+                        base = Some(inst.regs[1]);
+                        index = Some(inst.regs[2]);
+                        if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            mask = Some(RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()));
+                        }
+                    }
+                    OperandSpec::RegIndexBaseDisp_mask => {
+                        base = Some(inst.regs[1]);
+                        index = Some(inst.regs[2]);
+                        disp = Some(DispWidth::I32(inst.disp as i32));
+                        if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            mask = Some(RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()));
+                        }
+                    }
+                    OperandSpec::RegIndexBaseScale_mask => {
+                        base = Some(inst.regs[1]);
+                        index = Some(inst.regs[2]);
+                        scale = Some(inst.scale);
+                        if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            mask = Some(RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()));
+                        }
+                    }
+                    OperandSpec::RegIndexBaseScaleDisp_mask => {
+                        base = Some(inst.regs[1]);
+                        index = Some(inst.regs[2]);
+                        scale = Some(inst.scale);
+                        disp = Some(DispWidth::I32(inst.disp as i32));
+                        if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            mask = Some(RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()));
+                        }
+                    }
+                    _ => unsafe { unreachable_unchecked() },
+                };
+
+                Operand::Memory { seg, sz, base, index, scale, disp, mask }
             }
         }
     }

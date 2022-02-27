@@ -1,8 +1,8 @@
 //! This module defines common traits and characteristics from all three
 //! x86 processor modes.
-use core::fmt::{Debug, Display};
+use core::fmt::Debug;
 use yaxpeax_arch::{
-    AddressDiff, Arch, DecodeErrorBounds, Decoder, Instruction, LengthedInstruction, Reader,
+    AddressDiff, Arch, Decoder, Instruction, LengthedInstruction, Reader,
 };
 
 use crate::{x86_16, x86_32, x86_64};

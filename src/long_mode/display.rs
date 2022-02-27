@@ -4,8 +4,7 @@ use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 use yaxpeax_arch::display::*;
 
 use crate::MEM_SIZE_STRINGS;
-use crate::long_mode::{Opcode, Operand, MergeMode, InstDecoder, Instruction, PrefixRex, OperandSpec};
-use crate::display::regspec_label;
+use crate::long_mode::{Opcode, Operand, InstDecoder, Instruction, PrefixRex, OperandSpec};
 
 impl fmt::Display for InstDecoder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
