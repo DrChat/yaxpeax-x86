@@ -5148,6 +5148,7 @@ pub enum InnerDescription {
 }
 
 impl InnerDescription {
+    #[inline]
     fn with_id(self, id: u32) -> FieldDescription {
         FieldDescription {
             desc: self,

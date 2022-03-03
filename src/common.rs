@@ -37,6 +37,7 @@ impl X86Arch for x86_64 {
 pub trait X86Decoder<A: X86Arch + ?Sized> {
     /// decode one instruction for this architecture from the [`crate::Reader`] of this
     /// architecture's `Word`.
+    #[inline]
     fn decode<T: Reader<u64, u8>>(
         &self,
         words: &mut T,
@@ -62,6 +63,7 @@ pub trait X86Decoder<A: X86Arch + ?Sized> {
 }
 
 impl X86Decoder<x86_16> for crate::real_mode::InstDecoder {
+    #[inline]
     fn decode_into<T: Reader<u64, u8>>(
         &self,
         inst: &mut <x86_16 as X86Arch>::Instruction,
@@ -72,6 +74,7 @@ impl X86Decoder<x86_16> for crate::real_mode::InstDecoder {
 }
 
 impl X86Decoder<x86_32> for crate::protected_mode::InstDecoder {
+    #[inline]
     fn decode_into<T: Reader<u64, u8>>(
         &self,
         inst: &mut <x86_32 as X86Arch>::Instruction,
@@ -82,6 +85,7 @@ impl X86Decoder<x86_32> for crate::protected_mode::InstDecoder {
 }
 
 impl X86Decoder<x86_64> for crate::long_mode::InstDecoder {
+    #[inline]
     fn decode_into<T: Reader<u64, u8>>(
         &self,
         inst: &mut <x86_64 as X86Arch>::Instruction,
